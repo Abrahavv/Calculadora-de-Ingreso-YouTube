@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cálculadora de Ingreso YouTube</title>
+    <!-- Carga de Tailwind CSS para estilos -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <style>
+        /* Configuración global para el modo oscuro y la fuente Inter */
+        :root {
+            --youtube-red: #FF0000;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            /* Fondo muy oscuro, similar al modo nocturno de YouTube */
+            background-color: #0F0F0F; 
+        }
+
+        /* Estilo para el hover de los botones o elementos interactivos */
+        .yt-accent-hover:hover {
+            opacity: 0.8;
+            transition: opacity 0.2s ease;
+        }
+    </style>
+</head>
+<body class="antialiased min-h-screen flex items-center justify-center p-4">
+
+    <!-- Contenedor Principal de la Aplicación -->
+    <div class="w-full max-w-lg bg-gray-900 shadow-2xl rounded-2xl p-6 sm:p-10 border border-gray-800">
+        
+        <!-- Título y Descripción -->
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight flex items-center justify-center">
+                <svg class="w-8 h-8 mr-2 text-red-600" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-5-8a5 5 0 005 5h.01a5 5 0 005-5V5h-10v5zM7 9a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1z" clip-rule="evenodd"></path>
+                </svg>
+                💰 Cálculo de Ingreso YouTube
+            </h1>
+            <p class="mt-2 text-lg text-gray-400">
+                Estima tus ganancias mensuales usando Vistas y RPM.
+            </p>
+        </header>
+
+        <!-- Formulario de Entradas -->
+        <div class="space-y-6">
+            <!-- Campo: Vistas Mensuales -->
+            <div class="relative">
+                <label for="views" class="block text-sm font-medium text-gray-300 mb-2">
+                    Vistas Totales al Mes
+                </label>
+                <input
+                    id="views"
+                    type="number"
+                    min="0"
+                    placeholder="Ej: 500000"
+                    class="views-input w-full p-3 border border-gray-700 bg-gray-800 text-white rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150 shadow-md text-lg"
+                    oninput="handleInput(event, 'views')"
+                >
+            </div>
+
+            <!-- Campo: RPM (Revenue Per Mille) -->
+            <div class="relative">
+                <label for="rpm" class="block text-sm font-medium text-gray-300 mb-2">
+                    RPM (Ingreso por cada 1000 vistas) en $
+                </label>
+                <input
+                    id="rpm"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Ej: 4.50"
+                    class="rpm-input w-full p-3 border border-gray-700 bg-gray-800 text-white rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150 shadow-md text-lg"
+                    oninput="handleInput(event, 'rpm')"
+                >
+            </div>
+        </div>
+
+        <!-- Resultado -->
+        <div class="mt-10 p-6 bg-red-900/10 border-t-4 border-red-600 rounded-xl text-center shadow-inner shadow-red-500/10">
+            <h2 class="text-xl font-semibold text-red-400 mb-2">
+                Ingreso Mensual Estimado
+            </h2>
+            <p id="monthly-income" class="text-5xl font-extrabold text-white transition-all duration-300 ease-out">
+                $0.00
+            </p>
+            <p class="mt-3 text-sm text-gray-400">
+                Fórmula: (Vistas / 1000) × RPM
+            </p>
+        </div>
+
+    </div>
+
+    <!-- Lógica JavaScript -->
+    <script>
+        // Variables para almacenar los valores de entrada
+        let monthlyViews = 0;
+        let rpmValue = 0;
+        const incomeDisplay = document.getElementById('monthly-income');
+
+        /**
+         * Formatea un número como moneda (dólares) para la presentación.
+         * @param {number} value El número a formatear.
+         * @returns {string} La cadena de texto formateada.
+         */
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            }).format(value);
+        }
+
+        /**
+         * Calcula y actualiza el ingreso mensual estimado.
+         */
+        function calculateIncome() {
+            // Asegurarse de que los valores sean positivos
+            const views = Math.max(0, monthlyViews);
+            const rpm = Math.max(0, rpmValue);
+
+            let income = 0;
+            if (views > 0 && rpm > 0) {
+                // Fórmula: (Vistas / 1000) * RPM
+                income = (views / 1000) * rpm;
+            }
+
+            // Muestra el resultado formateado
+            incomeDisplay.textContent = formatCurrency(income);
+        }
+
+        /**
+         * Maneja la entrada de los campos numéricos y actualiza la variable y el cálculo.
+         * @param {Event} event El evento de entrada (input event).
+         * @param {'views' | 'rpm'} field El campo a actualizar.
+         */
+        function handleInput(event, field) {
+            const inputElement = event.target;
+            const rawValue = inputElement.value;
+            let value = parseFloat(rawValue);
+
+            if (isNaN(value) || value < 0) {
+                value = 0;
+            }
+
+            if (field === 'views') {
+                // Las vistas suelen ser números enteros
+                monthlyViews = Math.floor(value);
+            } else if (field === 'rpm') {
+                // RPM acepta decimales
+                rpmValue = value;
+            }
+            
+            // Recalcular el ingreso con el nuevo valor
+            calculateIncome();
+        }
+
+        // Inicializar el cálculo al cargar la página
+        window.onload = () => {
+            calculateIncome();
+        };
+
+    </script>
+
+</body>
+</html>
