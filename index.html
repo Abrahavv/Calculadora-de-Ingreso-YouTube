@@ -1,4 +1,8 @@
 <!DOCTYPE html>
+<!--
+  MIT License - Copyright (c) 2026 USUARIO
+  https://opensource.org/licenses/MIT
+-->
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -451,7 +455,7 @@
                 <span class="field-icon-left">
                     <svg viewBox="0 0 20 20"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>
                 </span>
-                <input id="views" type="text" inputmode="numeric" placeholder="500,000" class="field-input views-input" oninput="handleInput(event,'views')">
+                <input id="views" type="text" inputmode="numeric" placeholder="500,000" class="field-input views-input">
                 <span id="views-status" class="field-icon-right"></span>
             </div>
             <p class="field-hint">Solo números enteros positivos</p>
@@ -470,7 +474,7 @@
                 <span class="field-icon-left">
                     <svg viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h1a1 1 0 011-1h1a1 1 0 011 1v.98a2.5 2.5 0 012.496 2.398A3 3 0 0114 13a3 3 0 01-2.496-2.602A2.5 2.5 0 019.5 8H8V6h1a1 1 0 001-1V4a1 1 0 00-1-1H5a1 1 0 00-1 1v1a1 1 0 001 1h1v1H5a2 2 0 00-2 2zm7.5 5.02A1.5 1.5 0 0113 7h1a1.5 1.5 0 011.5 1.5V12a3 3 0 01-3 3 3 3 0 01-2.5-1.98z" clip-rule="evenodd"/></svg>
                 </span>
-                <input id="rpm" type="text" inputmode="decimal" placeholder="4.50" class="field-input rpm-input" oninput="handleInput(event,'rpm')">
+                <input id="rpm" type="text" inputmode="decimal" placeholder="4.50" class="field-input rpm-input">
                 <span id="rpm-status" class="field-icon-right"></span>
             </div>
             <p class="field-hint">Número decimal (ej: 4.50)</p>
@@ -514,74 +518,212 @@
 
     <div class="footer fade-d3">
         <p>Los resultados son estimaciones. El RPM real varía por nicho, audiencia y ubicación.</p>
-        <div class="footer-badge">
-            <svg width="10" height="10" viewBox="0 0 20 20" fill="#555"><circle cx="10" cy="10" r="4"/></svg>
-            v1.0 · 2026
+        <div style="display:flex; gap:6px; justify-content:center; flex-wrap:wrap; margin-top:8px;">
+            <div class="footer-badge">
+                <svg width="10" height="10" viewBox="0 0 20 20" fill="#555"><circle cx="10" cy="10" r="4"/></svg>
+                v1.0 · 2026
+            </div>
+            <div class="footer-badge">
+                <svg width="10" height="10" viewBox="0 0 20 20" fill="#555"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V14a.5.5 0 01-1 0V4.804z"/></svg>
+                MIT License
+            </div>
         </div>
     </div>
 </div>
 
 <script>
-    let monthlyViews = 0;
-    let rpmValue = 0;
-    let chart = null;
-    const incomeEl = document.getElementById('monthly-income');
-    const viewsEl = document.getElementById('views');
-    const rpmEl = document.getElementById('rpm');
-    const viewsIcon = document.getElementById('views-status');
-    const rpmIcon = document.getElementById('rpm-status');
-    const statusText = document.getElementById('status-text');
+// ═══════════════════════════════════════════════════════════════
+// Constants — SRP: centralized configuration, no logic
+// ═══════════════════════════════════════════════════════════════
+const Constants = Object.freeze({
+    DIVISOR: 1000,
+    SCENARIOS: [10000, 50000, 100000, 500000, 1000000],
+    LABELS: ['10K', '50K', '100K', '500K', '1M'],
+    HIGHLIGHT_INDEX: 3,
 
-    const scenarios = [10000, 50000, 100000, 500000, 1000000];
-    const labels = ['10K', '50K', '100K', '500K', '1M'];
+    COLORS: Object.freeze({
+        red:        'rgba(204,0,0,',
+        redLight:   'rgba(255,102,102,',
+        grid:       'rgba(255,255,255,0.04)',
+        tickY:      '#666',
+        tickX:      '#777',
+        tooltipBg:  '#1a1a1a',
+        tooltipBorder: '#333',
+    }),
 
-    function fmt(v) {
-        return new Intl.NumberFormat('en-US', { style:'currency', currency:'USD', minimumFractionDigits:2, maximumFractionDigits:2 }).format(v);
+    MESSAGES: Object.freeze({
+        active: 'Estimación activa',
+        empty:  'Ingresa datos',
+    }),
+
+    FIELD_TYPES: Object.freeze({ VIEWS: 'views', RPM: 'rpm' }),
+});
+
+// ═══════════════════════════════════════════════════════════════
+// IncomeCalculator — SRP: pure calculation, no side effects
+// ═══════════════════════════════════════════════════════════════
+class IncomeCalculator {
+    static calculate(views, rpm) {
+        const v = Math.max(0, views);
+        const r = Math.max(0, rpm);
+        return (v > 0 && r > 0) ? (v / Constants.DIVISOR) * r : 0;
     }
-    function fmtNum(n) { return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
-    function clean(s) { return s.replace(/[^0-9.]/g, ''); }
+}
 
-    function setStatus(input, icon, valid, empty) {
-        input.classList.remove('valid','invalid');
+// ═══════════════════════════════════════════════════════════════
+// InputValidator — SRP: validates raw input strings
+// ═══════════════════════════════════════════════════════════════
+class InputValidator {
+    static validateViews(raw) {
+        if (raw === '' || raw === '.') return { isValid: false, value: 0, empty: true };
+        const num = parseFloat(raw);
+        if (isNaN(num) || num < 0) return { isValid: false, value: 0, empty: false };
+        return { isValid: true, value: Math.floor(num), empty: false };
+    }
+
+    static validateRpm(raw) {
+        if (raw === '' || raw === '.') return { isValid: false, value: 0, empty: true };
+        const num = parseFloat(raw);
+        if (isNaN(num) || num < 0) return { isValid: false, value: 0, empty: false };
+        return { isValid: true, value: num, empty: false };
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// InputParser — SRP: sanitizes raw input strings
+// ═══════════════════════════════════════════════════════════════
+class InputParser {
+    static clean(raw) {
+        return raw.replace(/[^0-9.]/g, '');
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CurrencyFormatter — SRP: number formatting only
+// ═══════════════════════════════════════════════════════════════
+class CurrencyFormatter {
+    static #formatter = new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
+
+    static currency(value) {
+        return this.#formatter.format(value);
+    }
+
+    static withCommas(n) {
+        return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UIManager — SRP: manages all UI state updates
+// ═══════════════════════════════════════════════════════════════
+class UIManager {
+    #elements;
+
+    static VALID_BADGE = '<span class="field-badge ok"><svg width="10" height="10" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>Válido</span>';
+    static INVALID_BADGE = '<span class="field-badge err"><svg width="10" height="10" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>Inválido</span>';
+
+    constructor(elements) {
+        this.#elements = elements;
+    }
+
+    get incomeEl()     { return this.#elements.income; }
+    get viewsEl()      { return this.#elements.views; }
+    get rpmEl()        { return this.#elements.rpm; }
+    get viewsIcon()    { return this.#elements.viewsStatus; }
+    get rpmIcon()      { return this.#elements.rpmStatus; }
+    get statusTextEl() { return this.#elements.statusText; }
+
+    updateFieldStatus(input, icon, { isValid, empty }) {
+        input.classList.remove('valid', 'invalid');
         icon.classList.remove('visible');
         if (empty) { icon.innerHTML = ''; return; }
         icon.classList.add('visible');
-        if (valid) {
+        if (isValid) {
             input.classList.add('valid');
-            icon.innerHTML = '<span class="field-badge ok"><svg width="10" height="10" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>Válido</span>';
+            icon.innerHTML = UIManager.VALID_BADGE;
         } else {
             input.classList.add('invalid');
-            icon.innerHTML = '<span class="field-badge err"><svg width="10" height="10" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>Inválido</span>';
+            icon.innerHTML = UIManager.INVALID_BADGE;
         }
     }
 
-    function pulse() {
-        incomeEl.classList.remove('pulse');
-        void incomeEl.offsetWidth;
-        incomeEl.classList.add('pulse');
+    updateResult(formattedIncome) {
+        const el = this.incomeEl;
+        if (el.textContent !== formattedIncome) {
+            el.textContent = formattedIncome;
+            this.#pulse(el);
+        }
     }
 
-    function updateStatus() {
-        statusText.textContent = (monthlyViews > 0 && rpmValue > 0) ? 'Estimación activa' : 'Ingresa datos';
+    updateStatusText(views, rpm) {
+        this.statusTextEl.textContent =
+            (views > 0 && rpm > 0) ? Constants.MESSAGES.active : Constants.MESSAGES.empty;
     }
 
-    function initChart() {
-        const ctx = document.getElementById('scenarios-chart').getContext('2d');
-        const g1 = ctx.createLinearGradient(0,0,0,220);
-        g1.addColorStop(0,'rgba(204,0,0,0.7)');
-        g1.addColorStop(1,'rgba(204,0,0,0.15)');
-        const g2 = ctx.createLinearGradient(0,0,0,220);
-        g2.addColorStop(0,'rgba(255,102,102,0.85)');
-        g2.addColorStop(1,'rgba(255,102,102,0.25)');
+    #pulse(el) {
+        el.classList.remove('pulse');
+        void el.offsetWidth;
+        el.classList.add('pulse');
+    }
+}
 
-        chart = new Chart(ctx, {
+// ═══════════════════════════════════════════════════════════════
+// ChartManager — SRP: manages Chart.js lifecycle only
+// ═══════════════════════════════════════════════════════════════
+class ChartManager {
+    #chart = null;
+    #canvasId;
+
+    constructor(canvasId) {
+        this.#canvasId = canvasId;
+    }
+
+    init() {
+        const ctx = document.getElementById(this.#canvasId).getContext('2d');
+        const { COLORS } = Constants;
+
+        const g1 = ctx.createLinearGradient(0, 0, 0, 220);
+        g1.addColorStop(0, COLORS.red + '0.7)');
+        g1.addColorStop(1, COLORS.red + '0.15)');
+
+        const g2 = ctx.createLinearGradient(0, 0, 0, 220);
+        g2.addColorStop(0, COLORS.redLight + '0.85)');
+        g2.addColorStop(1, COLORS.redLight + '0.25)');
+
+        this.#chart = new Chart(ctx, this.#buildConfig(g1, g2));
+    }
+
+    update(rpm) {
+        if (!this.#chart) return;
+        const safeRpm = Math.max(0, rpm);
+        this.#chart.data.datasets[0].data =
+            Constants.SCENARIOS.map(v => IncomeCalculator.calculate(v, safeRpm));
+        this.#chart.update('active');
+    }
+
+    destroy() {
+        if (this.#chart) { this.#chart.destroy(); this.#chart = null; }
+    }
+
+    #buildConfig(g1, g2) {
+        const { COLORS } = Constants;
+        return {
             type: 'bar',
             data: {
-                labels,
+                labels: Constants.LABELS,
                 datasets: [{
-                    data: [0,0,0,0,0],
-                    backgroundColor: [g1,g1,g1,g2,g1],
-                    borderColor: ['rgba(204,0,0,0.15)','rgba(204,0,0,0.15)','rgba(204,0,0,0.15)','rgba(255,102,102,0.3)','rgba(204,0,0,0.15)'],
+                    data: [0, 0, 0, 0, 0],
+                    backgroundColor: [g1, g1, g1, g2, g1],
+                    borderColor: [
+                        COLORS.red + '0.15)', COLORS.red + '0.15)',
+                        COLORS.red + '0.15)', COLORS.redLight + '0.3)',
+                        COLORS.red + '0.15)'
+                    ],
                     borderWidth: 1,
                     borderRadius: 6,
                     borderSkipped: false,
@@ -594,10 +736,10 @@
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: '#1a1a1a',
+                        backgroundColor: COLORS.tooltipBg,
                         titleColor: '#fff',
                         bodyColor: '#bbb',
-                        borderColor: '#333',
+                        borderColor: COLORS.tooltipBorder,
                         borderWidth: 1,
                         cornerRadius: 8,
                         padding: 12,
@@ -606,74 +748,119 @@
                         bodyFont: { size: 11, family: 'Inter' },
                         callbacks: {
                             title: t => `${t[0].label} vistas/mes`,
-                            label: c => `Ingreso: ${fmt(c.parsed.y)}`,
-                            afterLabel: c => c.dataIndex === 3 ? '★ Tu estimación' : ''
+                            label: c => `Ingreso: ${CurrencyFormatter.currency(c.parsed.y)}`,
+                            afterLabel: c => c.dataIndex === Constants.HIGHLIGHT_INDEX ? '★ Tu estimación' : ''
                         }
                     }
                 },
                 scales: {
                     y: {
                         beginAtZero: true,
-                        grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+                        grid: { color: COLORS.grid, drawBorder: false },
                         border: { display: false },
                         ticks: {
-                            color: '#666',
+                            color: COLORS.tickY,
                             font: { size: 10, family: 'Inter' },
-                            callback: v => v >= 1000 ? '$'+(v/1000).toFixed(0)+'K' : '$'+v
+                            callback: v => v >= 1000 ? '$' + (v / 1000).toFixed(0) + 'K' : '$' + v
                         }
                     },
                     x: {
                         grid: { display: false },
                         border: { display: false },
-                        ticks: { color: '#777', font: { size: 10, weight: '600', family: 'Inter' } }
+                        ticks: { color: COLORS.tickX, font: { size: 10, weight: '600', family: 'Inter' } }
                     }
                 }
             }
+        };
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FieldConfig — OCP: registry for adding new input fields
+// ═══════════════════════════════════════════════════════════════
+const FieldConfig = Object.freeze({
+    [Constants.FIELD_TYPES.VIEWS]: {
+        validate: InputValidator.validateViews,
+        formatOnBlur: (val) => CurrencyFormatter.withCommas(val),
+        formatOnFocus: (val) => val,
+        isInteger: true,
+    },
+    [Constants.FIELD_TYPES.RPM]: {
+        validate: InputValidator.validateRpm,
+        formatOnBlur: (val) => val % 1 === 0 ? val.toFixed(2) : val,
+        formatOnFocus: (val) => val,
+        isInteger: false,
+    },
+});
+
+// ═══════════════════════════════════════════════════════════════
+// App — DIP: orchestrator, depends on abstractions only
+// ═══════════════════════════════════════════════════════════════
+class App {
+    #ui;
+    #chartManager;
+    #state = { views: 0, rpm: 0 };
+
+    constructor() {
+        this.#ui = new UIManager({
+            income:      document.getElementById('monthly-income'),
+            views:       document.getElementById('views'),
+            rpm:         document.getElementById('rpm'),
+            viewsStatus: document.getElementById('views-status'),
+            rpmStatus:   document.getElementById('rpm-status'),
+            statusText:  document.getElementById('status-text'),
         });
+
+        this.#chartManager = new ChartManager('scenarios-chart');
     }
 
-    function updateChart() {
-        if (!chart) return;
-        const r = Math.max(0, rpmValue);
-        chart.data.datasets[0].data = scenarios.map(v => (v/1000)*r);
-        chart.update('active');
+    init() {
+        this.#chartManager.init();
+        this.#bindField(this.#ui.viewsEl, this.#ui.viewsIcon, Constants.FIELD_TYPES.VIEWS);
+        this.#bindField(this.#ui.rpmEl, this.#ui.rpmIcon, Constants.FIELD_TYPES.RPM);
+        this.#recalc();
     }
 
-    function calc() {
-        const v = Math.max(0, monthlyViews);
-        const r = Math.max(0, rpmValue);
-        const inc = (v > 0 && r > 0) ? (v/1000)*r : 0;
-        const f = fmt(inc);
-        if (incomeEl.textContent !== f) { incomeEl.textContent = f; pulse(); }
-        updateChart();
-        updateStatus();
+    #bindField(inputEl, iconEl, fieldType) {
+        const config = FieldConfig[fieldType];
+
+        inputEl.addEventListener('input', (e) => {
+            const raw = InputParser.clean(e.target.value);
+            const result = config.validate(raw);
+
+            if (fieldType === Constants.FIELD_TYPES.VIEWS) {
+                this.#state.views = result.value;
+            } else {
+                this.#state.rpm = result.value;
+            }
+
+            this.#ui.updateFieldStatus(inputEl, iconEl, result);
+            this.#recalc();
+        });
+
+        inputEl.addEventListener('blur', function () {
+            const currentVal = fieldType === Constants.FIELD_TYPES.VIEWS ? this.#state.views : this.#state.rpm;
+            if (currentVal > 0) this.value = config.formatOnBlur(currentVal);
+        }.bind(this));
+
+        inputEl.addEventListener('focus', function () {
+            const currentVal = fieldType === Constants.FIELD_TYPES.VIEWS ? this.#state.views : this.#state.rpm;
+            if (currentVal > 0) this.value = config.formatOnFocus(currentVal);
+        }.bind(this));
     }
 
-    function handleInput(e, field) {
-        const el = e.target;
-        let raw = clean(el.value);
-        if (raw === '' || raw === '.') {
-            if (field === 'views') { monthlyViews = 0; setStatus(el, viewsIcon, false, true); }
-            else { rpmValue = 0; setStatus(el, rpmIcon, false, true); }
-            calc(); return;
-        }
-        let val = parseFloat(raw);
-        if (isNaN(val) || val < 0) {
-            if (field === 'views') { monthlyViews = 0; setStatus(el, viewsIcon, false, false); }
-            else { rpmValue = 0; setStatus(el, rpmIcon, false, false); }
-            calc(); return;
-        }
-        if (field === 'views') { monthlyViews = Math.floor(val); setStatus(el, viewsIcon, monthlyViews > 0, false); }
-        else { rpmValue = val; setStatus(el, rpmIcon, rpmValue > 0, false); }
-        calc();
+    #recalc() {
+        const income = IncomeCalculator.calculate(this.#state.views, this.#state.rpm);
+        this.#ui.updateResult(CurrencyFormatter.currency(income));
+        this.#chartManager.update(this.#state.rpm);
+        this.#ui.updateStatusText(this.#state.views, this.#state.rpm);
     }
+}
 
-    viewsEl.addEventListener('blur', function() { if (monthlyViews > 0) this.value = fmtNum(monthlyViews); });
-    viewsEl.addEventListener('focus', function() { if (monthlyViews > 0) this.value = monthlyViews; });
-    rpmEl.addEventListener('blur', function() { if (rpmValue > 0) this.value = rpmValue % 1 === 0 ? rpmValue.toFixed(2) : rpmValue; });
-    rpmEl.addEventListener('focus', function() { if (rpmValue > 0) this.value = rpmValue; });
-
-    window.onload = () => { initChart(); calc(); };
+// ═══════════════════════════════════════════════════════════════
+// Bootstrap
+// ═══════════════════════════════════════════════════════════════
+window.onload = () => new App().init();
 </script>
 </body>
 </html>
