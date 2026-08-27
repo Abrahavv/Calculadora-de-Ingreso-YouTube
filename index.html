@@ -4,166 +4,676 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cálculadora de Ingreso YouTube</title>
-    <!-- Carga de Tailwind CSS para estilos -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23cc0000'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Ctext x='12' y='17' text-anchor='middle' fill='white' font-size='14' font-weight='bold'%3E$%3C/text%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
-        /* Configuración global para el modo oscuro y la fuente Inter */
-        :root {
-            --youtube-red: #FF0000;
-        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-            font-family: 'Inter', sans-serif;
-            /* Fondo muy oscuro, similar al modo nocturno de YouTube */
-            background-color: #0F0F0F; 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 32px 16px;
+            background: #080808;
+            background-image: radial-gradient(ellipse 70% 50% at 50% 30%, rgba(204,0,0,0.04) 0%, transparent 70%);
+            color: #fff;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
         }
 
-        /* Estilo para el hover de los botones o elementos interactivos */
-        .yt-accent-hover:hover {
-            opacity: 0.8;
-            transition: opacity 0.2s ease;
+        @keyframes fadeIn { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes pulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.015); } }
+        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+        @keyframes glow { 0%,100% { opacity:0.5; } 50% { opacity:1; } }
+        .fade-in { animation: fadeIn 0.6s ease-out both; }
+        .fade-d1 { animation: fadeIn 0.6s ease-out 0.08s both; }
+        .fade-d2 { animation: fadeIn 0.6s ease-out 0.16s both; }
+        .fade-d3 { animation: fadeIn 0.6s ease-out 0.24s both; }
+        .pulse { animation: pulse 0.3s ease-in-out; }
+
+        /* ─── Main Card ─── */
+        .card {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            background: #111111;
+            border: 1px solid #222;
+            border-radius: 20px;
+            padding: 0;
+            overflow: hidden;
+        }
+        .card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 20px;
+            background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 0;
+        }
+        .card > * { position: relative; z-index: 1; }
+        .card-glow {
+            position: absolute;
+            top: -80px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            height: 160px;
+            background: radial-gradient(ellipse, rgba(204,0,0,0.12) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+            animation: glow 4s ease-in-out infinite;
+        }
+
+        /* ─── Header ─── */
+        .header { padding: 36px 36px 0; text-align: center; }
+        .header-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 56px;
+            height: 56px;
+            border-radius: 16px;
+            background: linear-gradient(135deg, #cc0000, #ff4444);
+            margin-bottom: 16px;
+            box-shadow: 0 8px 24px rgba(204,0,0,0.3);
+        }
+        .header-icon svg { width: 28px; height: 28px; fill: #fff; }
+        .header h1 {
+            font-size: 22px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #ffffff 30%, #cccccc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+            line-height: 1.2;
+        }
+        .header-sub { font-size: 13px; color: #888; margin-top: 6px; }
+        .header-line {
+            margin: 20px 36px 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #333, transparent);
+        }
+
+        /* ─── Body ─── */
+        .body { padding: 24px 36px 32px; }
+
+        /* ─── Field ─── */
+        .field { margin-bottom: 20px; }
+        .field:last-child { margin-bottom: 0; }
+        .field-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 10px;
+        }
+        .field-label svg { width: 14px; height: 14px; fill: #cc0000; flex-shrink: 0; }
+        .field-wrap { position: relative; display: flex; align-items: center; }
+        .field-icon-left {
+            position: absolute;
+            left: 14px;
+            display: flex;
+            align-items: center;
+            pointer-events: none;
+        }
+        .field-icon-left svg { width: 16px; height: 16px; fill: #555; }
+        .field-input {
+            width: 100%;
+            height: 48px;
+            padding: 0 44px 0 40px;
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 15px;
+            font-family: inherit;
+            font-weight: 600;
+            outline: none;
+            transition: all 0.25s ease;
+        }
+        .field-input::placeholder { color: #444; font-weight: 400; }
+        .field-input:hover { border-color: #3a3a3a; background: #1e1e1e; }
+        .field-input:focus {
+            border-color: #cc0000;
+            box-shadow: 0 0 0 4px rgba(204,0,0,0.1), inset 0 1px 2px rgba(0,0,0,0.2);
+            background: #1e1e1e;
+        }
+        .field-input.valid { border-color: #cc0000; }
+        .field-input.invalid { border-color: #552222; }
+        .field-icon-right {
+            position: absolute;
+            right: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+        }
+        .field-icon-right.visible { opacity: 1; }
+        .field-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .field-badge.ok { background: rgba(204,0,0,0.15); color: #ff6666; }
+        .field-badge.err { background: rgba(255,50,50,0.1); color: #aa4444; }
+        .field-hint {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            color: #666;
+            margin-top: 8px;
+        }
+
+        /* ─── Tooltip ─── */
+        .tip { position: relative; display: inline-flex; align-items: center; }
+        .tip-dot {
+            cursor: help;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #222;
+            border: 1px solid #333;
+            transition: all 0.2s;
+        }
+        .tip-dot:hover { background: #333; border-color: #444; }
+        .tip-dot svg { width: 9px; height: 9px; fill: #888; }
+        .tip-box {
+            position: absolute;
+            bottom: calc(100% + 10px);
+            left: 50%;
+            transform: translateX(-50%) translateY(6px);
+            width: 220px;
+            padding: 12px 14px;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 10px;
+            font-size: 11px;
+            line-height: 1.6;
+            color: #bbb;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            z-index: 100;
+            transition: all 0.2s ease;
+            box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+        }
+        .tip-box::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-top-color: #1a1a1a;
+        }
+        .tip:hover .tip-box { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0); }
+
+        /* ─── Result Card ─── */
+        .result-card {
+            margin-top: 24px;
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 16px;
+            padding: 28px 24px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .result-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent 5%, #cc0000 30%, #ff4444 50%, #cc0000 70%, transparent 95%);
+            background-size: 200% 100%;
+            animation: shimmer 3s linear infinite;
+        }
+        .result-card::after {
+            content: '';
+            position: absolute;
+            top: 3px; left: 0; right: 0;
+            height: 40px;
+            background: linear-gradient(to bottom, rgba(204,0,0,0.05), transparent);
+            pointer-events: none;
+        }
+        .result-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            position: relative;
+        }
+        .result-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #cc0000, #ff4444);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(204,0,0,0.3);
+        }
+        .result-icon svg { width: 16px; height: 16px; fill: #fff; }
+        .result-title {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #cc0000;
+        }
+        .result-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            background: rgba(204,0,0,0.08);
+            border: 1px solid rgba(204,0,0,0.15);
+            border-radius: 20px;
+            font-size: 9px;
+            font-weight: 700;
+            color: #cc0000;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 16px;
+        }
+        .result-status .dot {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: #cc0000;
+            animation: glow 2s ease-in-out infinite;
+        }
+        .result-amount {
+            font-size: 44px;
+            font-weight: 900;
+            color: #ffffff;
+            letter-spacing: -0.04em;
+            line-height: 1;
+            text-shadow: 0 0 40px rgba(204,0,0,0.15);
+        }
+        .result-formula {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 14px;
+            padding: 6px 14px;
+            background: #222;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 11px;
+            color: #777;
+        }
+        .result-formula svg { width: 12px; height: 12px; fill: #555; }
+
+        /* ─── Chart Card ─── */
+        .chart-card {
+            margin-top: 16px;
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 16px;
+            padding: 24px;
+        }
+        .chart-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+        .chart-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 700;
+            color: #fff;
+        }
+        .chart-title svg { width: 16px; height: 16px; fill: #cc0000; }
+        .chart-legend {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 10px;
+            color: #777;
+        }
+        .chart-legend span { display: flex; align-items: center; gap: 4px; }
+        .chart-legend .dot-red { width: 8px; height: 8px; border-radius: 2px; background: #cc0000; }
+        .chart-legend .dot-highlight { width: 8px; height: 8px; border-radius: 2px; background: #ff6666; }
+        .chart-sub { font-size: 11px; color: #666; margin-bottom: 16px; }
+        .chart-wrap { position: relative; height: 220px; }
+
+        /* ─── Footer ─── */
+        .footer {
+            margin: 20px 36px 0;
+            padding: 16px 0 0;
+            border-top: 1px solid transparent;
+            border-image: linear-gradient(90deg, transparent, #333, transparent) 1;
+            text-align: center;
+        }
+        .footer p { font-size: 10px; color: #555; line-height: 1.7; }
+        .footer-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 8px;
+            padding: 3px 8px;
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 6px;
+            font-size: 9px;
+            color: #666;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        *:focus-visible { outline: 2px solid #cc0000; outline-offset: 2px; }
+
+        @media (max-width: 480px) {
+            body { padding: 12px 10px; }
+            .header { padding: 28px 20px 0; }
+            .header-icon { width: 48px; height: 48px; border-radius: 14px; }
+            .header-icon svg { width: 24px; height: 24px; }
+            .header h1 { font-size: 18px; }
+            .header-line { margin: 16px 20px 0; }
+            .body { padding: 20px 20px 24px; }
+            .field-input { height: 44px; font-size: 14px; padding-left: 36px; }
+            .field-icon-left { left: 12px; }
+            .result-card { padding: 22px 16px; }
+            .result-amount { font-size: 34px; }
+            .chart-card { padding: 16px; }
+            .chart-wrap { height: 180px; }
+            .chart-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+            .footer { margin: 16px 20px 0; }
+            .tip-box { width: 180px; left: 0; transform: translateX(0) translateY(6px); }
+            .tip:hover .tip-box { transform: translateX(0) translateY(0); }
+            .tip-box::after { left: 16px; }
+        }
+        @media (min-width: 481px) and (max-width: 768px) {
+            .header { padding: 32px 28px 0; }
+            .header-line { margin: 18px 28px 0; }
+            .body { padding: 22px 28px 28px; }
+            .result-amount { font-size: 40px; }
+            .footer { margin: 18px 28px 0; }
         }
     </style>
 </head>
-<body class="antialiased min-h-screen flex items-center justify-center p-4">
+<body>
 
-    <!-- Contenedor Principal de la Aplicación -->
-    <div class="w-full max-w-lg bg-gray-900 shadow-2xl rounded-2xl p-6 sm:p-10 border border-gray-800">
-        
-        <!-- Título y Descripción -->
-        <header class="text-center mb-8">
-            <h1 class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight flex items-center justify-center">
-                <svg class="w-8 h-8 mr-2 text-red-600" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-5-8a5 5 0 005 5h.01a5 5 0 005-5V5h-10v5zM7 9a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1z" clip-rule="evenodd"></path>
-                </svg>
-                💰 Cálculo de Ingreso YouTube
-            </h1>
-            <p class="mt-2 text-lg text-gray-400">
-                Estima tus ganancias mensuales usando Vistas y RPM.
-            </p>
-        </header>
+<div class="card fade-in">
+    <div class="card-glow"></div>
 
-        <!-- Formulario de Entradas -->
-        <div class="space-y-6">
-            <!-- Campo: Vistas Mensuales -->
-            <div class="relative">
-                <label for="views" class="block text-sm font-medium text-gray-300 mb-2">
-                    Vistas Totales al Mes
-                </label>
-                <input
-                    id="views"
-                    type="number"
-                    min="0"
-                    placeholder="Ej: 500000"
-                    class="views-input w-full p-3 border border-gray-700 bg-gray-800 text-white rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150 shadow-md text-lg"
-                    oninput="handleInput(event, 'views')"
-                >
+    <div class="header">
+        <div class="header-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+        </div>
+        <h1>Cálculo de Ingreso YouTube</h1>
+        <p class="header-sub">Estima tus ganancias mensuales usando Vistas y RPM</p>
+    </div>
+    <div class="header-line"></div>
+
+    <div class="body">
+
+        <div class="field fade-d1">
+            <div class="field-label tip">
+                <svg viewBox="0 0 20 20"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>
+                <span>Vistas Totales al Mes</span>
+                <span class="tip-dot">
+                    <svg viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
+                </span>
+                <span class="tip-box">Total de vistas de todos tus videos en un mes. Disponible en YouTube Studio → Analytics.</span>
             </div>
+            <div class="field-wrap">
+                <span class="field-icon-left">
+                    <svg viewBox="0 0 20 20"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>
+                </span>
+                <input id="views" type="text" inputmode="numeric" placeholder="500,000" class="field-input views-input" oninput="handleInput(event,'views')">
+                <span id="views-status" class="field-icon-right"></span>
+            </div>
+            <p class="field-hint">Solo números enteros positivos</p>
+        </div>
 
-            <!-- Campo: RPM (Revenue Per Mille) -->
-            <div class="relative">
-                <label for="rpm" class="block text-sm font-medium text-gray-300 mb-2">
-                    RPM (Ingreso por cada 1000 vistas) en $
-                </label>
-                <input
-                    id="rpm"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="Ej: 4.50"
-                    class="rpm-input w-full p-3 border border-gray-700 bg-gray-800 text-white rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150 shadow-md text-lg"
-                    oninput="handleInput(event, 'rpm')"
-                >
+        <div class="field fade-d2">
+            <div class="field-label tip">
+                <svg viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h1a1 1 0 011-1h1a1 1 0 011 1v.98a2.5 2.5 0 012.496 2.398A3 3 0 0114 13a3 3 0 01-2.496-2.602A2.5 2.5 0 019.5 8H8V6h1a1 1 0 001-1V4a1 1 0 00-1-1H5a1 1 0 00-1 1v1a1 1 0 001 1h1v1H5a2 2 0 00-2 2zm7.5 5.02A1.5 1.5 0 0113 7h1a1.5 1.5 0 011.5 1.5V12a3 3 0 01-3 3 3 3 0 01-2.5-1.98z" clip-rule="evenodd"/></svg>
+                <span>RPM (Ingreso / 1,000 vistas)</span>
+                <span class="tip-dot">
+                    <svg viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
+                </span>
+                <span class="tip-box"><strong>RPM</strong> = Revenue Per Mille. Ganancia por cada 1,000 vistas. Varía según nicho ($2–$10 promedio).</span>
+            </div>
+            <div class="field-wrap">
+                <span class="field-icon-left">
+                    <svg viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h1a1 1 0 011-1h1a1 1 0 011 1v.98a2.5 2.5 0 012.496 2.398A3 3 0 0114 13a3 3 0 01-2.496-2.602A2.5 2.5 0 019.5 8H8V6h1a1 1 0 001-1V4a1 1 0 00-1-1H5a1 1 0 00-1 1v1a1 1 0 001 1h1v1H5a2 2 0 00-2 2zm7.5 5.02A1.5 1.5 0 0113 7h1a1.5 1.5 0 011.5 1.5V12a3 3 0 01-3 3 3 3 0 01-2.5-1.98z" clip-rule="evenodd"/></svg>
+                </span>
+                <input id="rpm" type="text" inputmode="decimal" placeholder="4.50" class="field-input rpm-input" oninput="handleInput(event,'rpm')">
+                <span id="rpm-status" class="field-icon-right"></span>
+            </div>
+            <p class="field-hint">Número decimal (ej: 4.50)</p>
+        </div>
+
+        <div class="result-card fade-d2">
+            <div class="result-header">
+                <div class="result-icon">
+                    <svg viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clip-rule="evenodd"/></svg>
+                </div>
+                <span class="result-title">Ingreso Mensual Estimado</span>
+            </div>
+            <div class="result-status">
+                <span class="dot"></span>
+                <span id="status-text">Ingresa datos</span>
+            </div>
+            <div id="monthly-income" class="result-amount">$0.00</div>
+            <div class="result-formula">
+                <svg viewBox="0 0 20 20"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clip-rule="evenodd"/></svg>
+                (Vistas ÷ 1,000) × RPM
             </div>
         </div>
 
-        <!-- Resultado -->
-        <div class="mt-10 p-6 bg-red-900/10 border-t-4 border-red-600 rounded-xl text-center shadow-inner shadow-red-500/10">
-            <h2 class="text-xl font-semibold text-red-400 mb-2">
-                Ingreso Mensual Estimado
-            </h2>
-            <p id="monthly-income" class="text-5xl font-extrabold text-white transition-all duration-300 ease-out">
-                $0.00
-            </p>
-            <p class="mt-3 text-sm text-gray-400">
-                Fórmula: (Vistas / 1000) × RPM
-            </p>
+        <div class="chart-card fade-d3">
+            <div class="chart-header">
+                <div class="chart-title">
+                    <svg viewBox="0 0 20 20"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zm6-4a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zm6-3a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
+                    Proyección por Escenarios
+                </div>
+                <div class="chart-legend">
+                    <span><span class="dot-red"></span> Estándar</span>
+                    <span><span class="dot-highlight"></span> Tu estimación</span>
+                </div>
+            </div>
+            <p class="chart-sub">Comparación de ingresos según diferentes cantidades de vistas</p>
+            <div class="chart-wrap">
+                <canvas id="scenarios-chart"></canvas>
+            </div>
         </div>
-
     </div>
 
-    <!-- Lógica JavaScript -->
-    <script>
-        // Variables para almacenar los valores de entrada
-        let monthlyViews = 0;
-        let rpmValue = 0;
-        const incomeDisplay = document.getElementById('monthly-income');
+    <div class="footer fade-d3">
+        <p>Los resultados son estimaciones. El RPM real varía por nicho, audiencia y ubicación.</p>
+        <div class="footer-badge">
+            <svg width="10" height="10" viewBox="0 0 20 20" fill="#555"><circle cx="10" cy="10" r="4"/></svg>
+            v1.0 · 2026
+        </div>
+    </div>
+</div>
 
-        /**
-         * Formatea un número como moneda (dólares) para la presentación.
-         * @param {number} value El número a formatear.
-         * @returns {string} La cadena de texto formateada.
-         */
-        function formatCurrency(value) {
-            return new Intl.NumberFormat('en-US', {
-                style: 'currency',
-                currency: 'USD',
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-            }).format(value);
+<script>
+    let monthlyViews = 0;
+    let rpmValue = 0;
+    let chart = null;
+    const incomeEl = document.getElementById('monthly-income');
+    const viewsEl = document.getElementById('views');
+    const rpmEl = document.getElementById('rpm');
+    const viewsIcon = document.getElementById('views-status');
+    const rpmIcon = document.getElementById('rpm-status');
+    const statusText = document.getElementById('status-text');
+
+    const scenarios = [10000, 50000, 100000, 500000, 1000000];
+    const labels = ['10K', '50K', '100K', '500K', '1M'];
+
+    function fmt(v) {
+        return new Intl.NumberFormat('en-US', { style:'currency', currency:'USD', minimumFractionDigits:2, maximumFractionDigits:2 }).format(v);
+    }
+    function fmtNum(n) { return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+    function clean(s) { return s.replace(/[^0-9.]/g, ''); }
+
+    function setStatus(input, icon, valid, empty) {
+        input.classList.remove('valid','invalid');
+        icon.classList.remove('visible');
+        if (empty) { icon.innerHTML = ''; return; }
+        icon.classList.add('visible');
+        if (valid) {
+            input.classList.add('valid');
+            icon.innerHTML = '<span class="field-badge ok"><svg width="10" height="10" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>Válido</span>';
+        } else {
+            input.classList.add('invalid');
+            icon.innerHTML = '<span class="field-badge err"><svg width="10" height="10" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>Inválido</span>';
         }
+    }
 
-        /**
-         * Calcula y actualiza el ingreso mensual estimado.
-         */
-        function calculateIncome() {
-            // Asegurarse de que los valores sean positivos
-            const views = Math.max(0, monthlyViews);
-            const rpm = Math.max(0, rpmValue);
+    function pulse() {
+        incomeEl.classList.remove('pulse');
+        void incomeEl.offsetWidth;
+        incomeEl.classList.add('pulse');
+    }
 
-            let income = 0;
-            if (views > 0 && rpm > 0) {
-                // Fórmula: (Vistas / 1000) * RPM
-                income = (views / 1000) * rpm;
+    function updateStatus() {
+        statusText.textContent = (monthlyViews > 0 && rpmValue > 0) ? 'Estimación activa' : 'Ingresa datos';
+    }
+
+    function initChart() {
+        const ctx = document.getElementById('scenarios-chart').getContext('2d');
+        const g1 = ctx.createLinearGradient(0,0,0,220);
+        g1.addColorStop(0,'rgba(204,0,0,0.7)');
+        g1.addColorStop(1,'rgba(204,0,0,0.15)');
+        const g2 = ctx.createLinearGradient(0,0,0,220);
+        g2.addColorStop(0,'rgba(255,102,102,0.85)');
+        g2.addColorStop(1,'rgba(255,102,102,0.25)');
+
+        chart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [{
+                    data: [0,0,0,0,0],
+                    backgroundColor: [g1,g1,g1,g2,g1],
+                    borderColor: ['rgba(204,0,0,0.15)','rgba(204,0,0,0.15)','rgba(204,0,0,0.15)','rgba(255,102,102,0.3)','rgba(204,0,0,0.15)'],
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    borderSkipped: false,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 500, easing: 'easeOutQuart' },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#1a1a1a',
+                        titleColor: '#fff',
+                        bodyColor: '#bbb',
+                        borderColor: '#333',
+                        borderWidth: 1,
+                        cornerRadius: 8,
+                        padding: 12,
+                        displayColors: false,
+                        titleFont: { size: 12, weight: '700', family: 'Inter' },
+                        bodyFont: { size: 11, family: 'Inter' },
+                        callbacks: {
+                            title: t => `${t[0].label} vistas/mes`,
+                            label: c => `Ingreso: ${fmt(c.parsed.y)}`,
+                            afterLabel: c => c.dataIndex === 3 ? '★ Tu estimación' : ''
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
+                        border: { display: false },
+                        ticks: {
+                            color: '#666',
+                            font: { size: 10, family: 'Inter' },
+                            callback: v => v >= 1000 ? '$'+(v/1000).toFixed(0)+'K' : '$'+v
+                        }
+                    },
+                    x: {
+                        grid: { display: false },
+                        border: { display: false },
+                        ticks: { color: '#777', font: { size: 10, weight: '600', family: 'Inter' } }
+                    }
+                }
             }
+        });
+    }
 
-            // Muestra el resultado formateado
-            incomeDisplay.textContent = formatCurrency(income);
+    function updateChart() {
+        if (!chart) return;
+        const r = Math.max(0, rpmValue);
+        chart.data.datasets[0].data = scenarios.map(v => (v/1000)*r);
+        chart.update('active');
+    }
+
+    function calc() {
+        const v = Math.max(0, monthlyViews);
+        const r = Math.max(0, rpmValue);
+        const inc = (v > 0 && r > 0) ? (v/1000)*r : 0;
+        const f = fmt(inc);
+        if (incomeEl.textContent !== f) { incomeEl.textContent = f; pulse(); }
+        updateChart();
+        updateStatus();
+    }
+
+    function handleInput(e, field) {
+        const el = e.target;
+        let raw = clean(el.value);
+        if (raw === '' || raw === '.') {
+            if (field === 'views') { monthlyViews = 0; setStatus(el, viewsIcon, false, true); }
+            else { rpmValue = 0; setStatus(el, rpmIcon, false, true); }
+            calc(); return;
         }
-
-        /**
-         * Maneja la entrada de los campos numéricos y actualiza la variable y el cálculo.
-         * @param {Event} event El evento de entrada (input event).
-         * @param {'views' | 'rpm'} field El campo a actualizar.
-         */
-        function handleInput(event, field) {
-            const inputElement = event.target;
-            const rawValue = inputElement.value;
-            let value = parseFloat(rawValue);
-
-            if (isNaN(value) || value < 0) {
-                value = 0;
-            }
-
-            if (field === 'views') {
-                // Las vistas suelen ser números enteros
-                monthlyViews = Math.floor(value);
-            } else if (field === 'rpm') {
-                // RPM acepta decimales
-                rpmValue = value;
-            }
-            
-            // Recalcular el ingreso con el nuevo valor
-            calculateIncome();
+        let val = parseFloat(raw);
+        if (isNaN(val) || val < 0) {
+            if (field === 'views') { monthlyViews = 0; setStatus(el, viewsIcon, false, false); }
+            else { rpmValue = 0; setStatus(el, rpmIcon, false, false); }
+            calc(); return;
         }
+        if (field === 'views') { monthlyViews = Math.floor(val); setStatus(el, viewsIcon, monthlyViews > 0, false); }
+        else { rpmValue = val; setStatus(el, rpmIcon, rpmValue > 0, false); }
+        calc();
+    }
 
-        // Inicializar el cálculo al cargar la página
-        window.onload = () => {
-            calculateIncome();
-        };
+    viewsEl.addEventListener('blur', function() { if (monthlyViews > 0) this.value = fmtNum(monthlyViews); });
+    viewsEl.addEventListener('focus', function() { if (monthlyViews > 0) this.value = monthlyViews; });
+    rpmEl.addEventListener('blur', function() { if (rpmValue > 0) this.value = rpmValue % 1 === 0 ? rpmValue.toFixed(2) : rpmValue; });
+    rpmEl.addEventListener('focus', function() { if (rpmValue > 0) this.value = rpmValue; });
 
-    </script>
-
+    window.onload = () => { initChart(); calc(); };
+</script>
 </body>
 </html>
